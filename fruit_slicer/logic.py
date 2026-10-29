@@ -63,6 +63,39 @@ def cam_to_screen(tip: tuple[float, float], cam_size: tuple[int, int],
     return tip[0] * sw, (tip[1] * ch - y0) / crop_h * sh
 
 
+class OneEuro:
+    """Jitter filter for the fingertip (Casiez et al. 2012, "1 Euro filter").
+
+    Smooths hard when the finger is still and hardly at all when it moves fast, so a swipe isn't delayed.
+    """
+
+    def __init__(self, min_cutoff: float = 1.0, beta: float = 0.007, d_cutoff: float = 1.0):
+        self.min_cutoff, self.beta, self.d_cutoff = min_cutoff, beta, d_cutoff
+        self.x: tuple[float, float] | None = None
+        self.dx = (0.0, 0.0)
+        self.t = 0.0
+
+    @staticmethod
+    def _alpha(cutoff: float, dt: float) -> float:
+        tau = 1.0 / (2 * math.pi * cutoff)
+        return 1.0 / (1.0 + tau / dt)
+
+    def reset(self) -> None:
+        self.x = None
+
+    def __call__(self, x: tuple[float, float], t: float) -> tuple[float, float]:
+        if self.x is None or t <= self.t:
+            self.x, self.dx, self.t = x, (0.0, 0.0), t
+            return x
+        dt = t - self.t
+        a_d = self._alpha(self.d_cutoff, dt)
+        dx = tuple(a_d * (n - o) / dt + (1 - a_d) * p for n, o, p in zip(x, self.x, self.dx))
+        a = self._alpha(self.min_cutoff + self.beta * math.hypot(*dx), dt)
+        self.x = tuple(a * n + (1 - a) * o for n, o in zip(x, self.x))
+        self.dx, self.t = dx, t
+        return self.x
+
+
 @dataclass
 class Round:
     duration: float = 60.0

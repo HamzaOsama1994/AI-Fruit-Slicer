@@ -13,7 +13,7 @@ from pathlib import Path
 import pygame
 
 from . import assets
-from .logic import MIN_SLICE_SPEED, Body, Round, cam_to_screen, launch, segment_hits_circle
+from .logic import MIN_SLICE_SPEED, Body, OneEuro, Round, cam_to_screen, launch, segment_hits_circle
 from .tracker import HandTracker
 
 W, H = 1280, 720
@@ -41,6 +41,7 @@ class Game:
         self.whole = {k: assets.whole(k) for k in assets.FRUITS}
         self.halves = {k: assets.halves(k) for k in assets.FRUITS}
         self.bomb_img = assets.bomb()
+        self.rotations: dict[tuple[int, int], pygame.Surface] = {}
         self.dim = pygame.Surface((W, H), pygame.SRCALPHA)
         self.dim.fill((10, 10, 25, 120))
         self.backdrop = pygame.Surface((W, H))
@@ -52,6 +53,7 @@ class Game:
         self.best = load_best()
         self.trail: deque[tuple[float, float, float]] = deque()
         self.last_seq, self.hand_seen, self.tip_screen = -1, -10.0, None
+        self.smooth = OneEuro()  # removes fingertip jitter without delaying fast swipes
         self.bodies: list[Body] = []
         self.pieces: list[tuple[Body, pygame.Surface]] = []
         self.particles: list[list] = []
@@ -88,8 +90,9 @@ class Game:
             self.last_seq = seq
             if tip is None:
                 self.trail.clear()  # hand lost: never join the old and new positions into one cut
+                self.smooth.reset()
             else:
-                self.tip_screen = cam_to_screen(tip, (frame.shape[1], frame.shape[0]), (W, H))
+                self.tip_screen = self.smooth(cam_to_screen(tip, (frame.shape[1], frame.shape[0]), (W, H)), t)
                 self.hand_seen = now
                 points.append((*self.tip_screen, t))
         if pygame.mouse.get_pressed()[0]:
@@ -206,7 +209,10 @@ class Game:
         self.screen.blit(self.bg, (0, 0))
 
     def blit_rotated(self, img: pygame.Surface, x: float, y: float, angle: float) -> None:
-        rotated = pygame.transform.rotate(img, angle)
+        key = (id(img), int(angle // 6) % 60)  # rotating every sprite every frame caused dropped frames
+        if key not in self.rotations:
+            self.rotations[key] = pygame.transform.rotozoom(img, key[1] * 6, 1)  # rotozoom = smooth edges
+        rotated = self.rotations[key]
         self.screen.blit(rotated, rotated.get_rect(center=(int(x), int(y))))
 
     def draw(self, now: float) -> None:
@@ -236,12 +242,20 @@ class Game:
 
     def draw_blade(self, now: float) -> None:
         pts = [(x, y) for x, y, _ in self.trail]
+        if len(self.trail) >= 2 and now - self.hand_seen < 0.1:
+            # The camera gives a position ~30x a second but the screen draws 60x: carry the blade on along
+            # its current motion until the next sample, so it moves smoothly instead of in steps.
+            (x0, y0, t0), (x1, y1, t1) = self.trail[-2], self.trail[-1]
+            if t1 > t0:
+                ahead = min(now - t1, 0.05) / (t1 - t0)
+                pts.append((x1 + (x1 - x0) * ahead, y1 + (y1 - y0) * ahead))
         for i in range(1, len(pts)):
             width = 2 + 12 * i // len(pts)
             pygame.draw.line(self.screen, (70, 190, 255), pts[i - 1], pts[i], width + 6)
             pygame.draw.line(self.screen, (255, 255, 255), pts[i - 1], pts[i], width)
         if self.tip_screen and now - self.hand_seen < 0.3:  # show where the finger is, even when still
-            pygame.draw.circle(self.screen, (255, 255, 255), [int(v) for v in self.tip_screen], 9, 3)
+            tip = pts[-1] if len(pts) >= 2 else self.tip_screen
+            pygame.draw.circle(self.screen, (255, 255, 255), [int(v) for v in tip], 9, 3)
 
     def draw_menu(self) -> None:
         s, now = self.screen, time.perf_counter()

@@ -58,3 +58,27 @@ def test_round_ends_on_time_and_speeds_up():
     assert not r.over and r.spawn_interval < start
     r.tick(2)
     assert r.over and r.time_left == 0
+
+
+def test_one_euro_smooths_jitter_when_still():
+    from fruit_slicer.logic import OneEuro
+    f, rng = OneEuro(), random.Random(0)
+    out = [f((500 + rng.uniform(-6, 6), 300 + rng.uniform(-6, 6)), i / 30) for i in range(60)]
+    xs = [p[0] for p in out[30:]]
+    assert max(xs) - min(xs) < 6  # raw jitter spans ~12 px
+
+
+def test_one_euro_keeps_up_with_a_fast_swipe():
+    from fruit_slicer.logic import OneEuro
+    f = OneEuro()
+    for i in range(10):
+        x = f((100 + i * 60, 300), i / 30)  # 1800 px/s swipe
+    assert x[0] > 100 + 9 * 60 - 30  # less than one camera frame behind
+
+
+def test_one_euro_reset_jumps_to_new_position():
+    from fruit_slicer.logic import OneEuro
+    f = OneEuro()
+    f((0, 0), 0.0)
+    f.reset()
+    assert f((900, 500), 0.1) == (900, 500)
