@@ -1,0 +1,20 @@
+[project]
+name = "ai-fruit-slicer"
+version = "0.1.0"
+description = "Gesture-controlled fruit slicing game: webcam + MediaPipe hand tracking + Pygame"
+requires-python = ">=3.10,<3.13"  # mediapipe 0.10.21 has no wheels for 3.13+
+dependencies = [
+    "mediapipe==0.10.21",
+    "opencv-python==4.11.0.86",
+    "numpy==1.26.4",
+    "pygame==2.6.1",
+    "arabic-reshaper==3.0.0",
+    "python-bidi==0.6.6",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
