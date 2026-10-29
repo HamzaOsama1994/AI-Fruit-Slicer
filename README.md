@@ -5,6 +5,9 @@ A gesture-controlled fruit-slicing game: the webcam tracks your index finger wit
 
 Student project for the 2026 innovation fair.
 
+![Menu and gameplay](docs/screenshot.png)
+*Menu (left) and a round in play (right). In the real game your mirrored camera image is the background.*
+
 ## Status
 Playable. Tested on Windows 11 with a laptop webcam: hand tracking runs at ~28 fps and the game holds 60 fps.
 
@@ -52,3 +55,6 @@ Options: `--camera 1` (another webcam), `--duration 90` (round length in seconds
 
 ## Pinned versions
 Python 3.12 · mediapipe 0.10.21 · opencv-python 4.11.0.86 · numpy 1.26.4 · pygame 2.6.1 · arabic-reshaper 3.0.0 · python-bidi 0.6.6
+
+## License
+[MIT](LICENSE) © 2026 Hamza Alqaruoti. Uses [MediaPipe](https://github.com/google-ai-edge/mediapipe) (Apache-2.0) and [pygame](https://www.pygame.org) (LGPL).
